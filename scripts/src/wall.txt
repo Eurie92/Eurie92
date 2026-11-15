@@ -1,0 +1,53 @@
+
+// SERAPH: the archangel sculpture rebuilt from nano-glyphs. Every inked cell of the reference
+// is a particle with a spring home (swarm intro, cursor scatter, click shockwave).
+// Wings keep the sculpture's own feather texture but are skinned to a pivot behind each
+// shoulder: every cell rotates by an angle that grows and lags with distance from the root,
+// so a slow heavy beat whips out to the ragged tips. Feathers flutter per cell, the wing
+// folds (narrows) on the upstroke and light rolls across it. Legs hang and sway; the
+// pointed toes keep dissolving into a thin trail of dust.
+// Canvas background: halo glow and a dark dot field that ripples where the wings push air or you
+// touch it. The room itself (source page, light, mist) is HeroBackdrop.
+
+const SRC = "/archangel-reference.png";
+const ASPECT = 736 / 1053;
+// Anchors in source space (0..1 of width / height).
+const HEAD = { x: 0.505, y: 0.355 };
+const CORE = { x: 0.505, y: 0.5 };
+const PIVOT_L = { x: 0.42, y: 0.42 }, PIVOT_R = { x: 0.6, y: 0.42 };
+const LEG_SPLIT = 388 / 736; // gap between the two legs
+const BEAT = 1.35; // rad/s: one slow, heavy stroke every ~4.6s
+const AMP = 0.17; // wing tip swing (rad)
+// the sculpted sprite is baked to a file (scripts/bake-seraph.mjs, via ?bake=1), so visitors
+// skip the per-load canvas surgery. Falls back to sculpting live if the file is missing.
+const BAKED = "/seraph-baked.webp";
+const BAKE = new URLSearchParams(location.search).has("bake");
+// halo colours (rgb): lilac core into deep violet, the hero's only violet light
+const HALO_HI = "225,217,246", HALO_LO = "128,108,180";
+const DEBUG_T = Number(new URLSearchParams(location.search).get("t")) || 0;
+
+// tone curve: keep the sculpture dark, let carved highlights pop
+const lift = (v: number) => 0.08 + Math.pow(v, 1.15);
+
+const hash = (i: number) => {
+  const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
+
+// cell kinds
+const BODY = 0, WING_L = 1, WING_R = 2, HALO = 3;
+/** Classify a source cell: halo ring, body (head, torso, arms, legs) or wing. */
+const kindOf = (u: number, v: number) => {
+  const d = Math.abs(u - CORE.x);
+  if (v < 0.378 && v > 0.318 && d < 0.13 && !(v > 0.362 && d < 0.04)) return HALO;
+  let lim: number;
+  if (v < 0.36) lim = -1;
+  else if (v < 0.4) lim = 0.05;
+  else if (v < 0.45) lim = 0.14;
+  else if (v < 0.5) lim = 0.17;
+  else if (v < 0.56) lim = u < CORE.x ? 0.175 : 0.225;
+  else lim = 0.27;
+  if (d < lim) return BODY;
+  return u < CORE.x ? WING_L : WING_R;
+};
+
