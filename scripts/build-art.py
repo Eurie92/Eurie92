@@ -441,7 +441,334 @@ def creed(narrow=False):
     return svg(w, h, defs + bg + veil + fg, title="Find what you love and let it kill you. Attributed to Charles Bukowski.")
 
 
+# ---------------------------------------------------------------- panels
+# Everything GitHub would render as plain markdown is drawn here instead, so the README
+# keeps the site's dark room in light mode too. Links stay clickable via the <a> around each image.
+PANEL_CSS = (
+    ".ln{animation:in .5s ease-out both}@keyframes in{from{opacity:0;transform:translateX(-6px)}}"
+    ".cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}"
+    f".t0{{fill:{UMBER}}}.t1{{fill:{GILT}}}.t2{{fill:{BONE}}}"
+)
+
+
+def frame(w, h, inset=14):
+    return (f'<rect x="{inset}" y="{inset}" width="{w - 2 * inset}" height="{h - 2 * inset}" fill="none" '
+            f'stroke="{UMBER}" stroke-opacity=".55"/>')
+
+
+def portrait_grid(cols, rows):
+    im = Image.open(SRC / "me.png").convert("RGBA")
+    a = im.getchannel("A").resize((cols, rows), Image.LANCZOS)
+    l = im.convert("L").resize((cols, rows), Image.LANCZOS)
+    rnd = random.Random(5)
+    grid = []
+    for y in range(rows):
+        row = []
+        for x in range(cols):
+            al, lu = a.getpixel((x, y)) / 255, l.getpixel((x, y)) / 255
+            if al < 0.4:
+                row.append(None)
+                continue
+            v = 0.15 + lu * 0.85
+            tone = 2 if lu > 0.62 else (1 if lu > 0.3 else 0)
+            row.append((rnd.choice(CODE_RAMP[min(9, int(v * 10))]), tone))
+        grid.append(row)
+    return grid
+
+
+def whoami(narrow=False):
+    rows_ = [
+        ("based in", "Philippines (UTC+8), working remote"),
+        ("status", "open for projects"),
+        ("builds", "websites, web shops, POS, extensions,"),
+        ("", "plugins, bots, AI agents"),
+        ("promise", "it works. it looks good. it's safe."),
+        ("signature", "compiled from scratch"),
+    ]
+    if narrow:
+        w, h, x, size, lh, kw = 600, 470, 40, 15, 30, 13
+    else:
+        w, h, x, size, lh, kw = 1200, 440, 60, 18, 34, 14
+    y = 96
+    out = [frame(w, h),
+           f'<text class="m" x="{x - 10}" y="52" font-size="11" fill="{UMBER}" letter-spacing="3">EURIE@SERAPH: ~</text>',
+           f'<line x1="14" x2="{w - 14}" y1="70" y2="70" stroke="{UMBER}" stroke-opacity=".55"/>']
+    d = 0.0
+
+    def line(inner):
+        nonlocal y, d
+        out.append(f'<text class="m ln" x="{x}" y="{y}" font-size="{size}" style="animation-delay:{d:.2f}s">{inner}</text>')
+        y += lh
+        d += 0.18
+
+    line(f'<tspan fill="{VIOLET}">$</tspan><tspan fill="{BONE}"> whoami</tspan>')
+    line(f'<tspan fill="{BONE}">eurie paulino</tspan><tspan fill="{UMBER}">  ·  </tspan><tspan fill="{GILT}">software / ai engineer</tspan>')
+    y += lh * 0.3
+    for k, v in rows_:
+        dots = "" if not k else " " + "." * (kw - len(k)) + " "
+        pad = " " * (kw + 2) if not k else ""
+        line(f'<tspan fill="{GILT}">  {esc(k)}</tspan><tspan fill="{UMBER}">{dots}</tspan>'
+             f'<tspan fill="{BONE}">{pad}{esc(v)}</tspan>')
+    y += lh * 0.3
+    line(f'<tspan fill="{VIOLET}">$</tspan><tspan class="cur" fill="{BONE}"> _</tspan>')
+    if not narrow:
+        g = portrait_grid(64, 50)
+        cw, ch = 5.4, 6.6
+        out.append(f'<g class="m" opacity=".95">{grid_text(g, 1200 - 60 - 64 * cw, 78, cw, ch, 9, ("t0", "t1", "t2"))}</g>')
+        out.append(f'<text class="i" x="{1200 - 60 - 32 * cw:.0f}" y="{h - 34}" font-size="15" fill="{MUTED}" text-anchor="middle">the name on the chains</text>')
+    return svg(w, h, "".join(out), PANEL_CSS,
+               title="whoami: Eurie Paulino, software and AI engineer. Philippines, open for projects. Builds websites, "
+                     "web shops, POS, extensions, plugins, bots, AI agents. It works, it looks good, it's safe.")
+
+
+def shot_b64(name, width=1120):
+    im = Image.open(ROOT / "assets" / "work" / name)
+    im = im.resize((width, round(im.size[1] * width / im.size[0])), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, "WEBP", quality=78)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+WORK = [
+    dict(n="01", slug="xnight", title="XNight", line="A digital product shop that sells, takes payment and delivers on its own, around the clock.",
+         pain="Selling by hand means late replies and lost orders.", stat=("24/7", "sells and delivers itself"),
+         tags=["Next.js", "Supabase", "TypeScript"], cta="VISIT SITE  -->"),
+    dict(n="02", slug="fullstack-audit", title="Fullstack Audit", line="An architecture map for AI coding agents, so they read a codebase without burning tokens.",
+         pain="AI agents burn tokens re-reading a codebase.", stat=("-92%", "tokens per audit, up to"),
+         tags=["TypeScript", "MCP", "AST"], cta="VIEW REPO  -->"),
+    dict(n="03", slug="teleplug", title="TelePlug", line="A Telegram broadcaster and forwarder with a live dashboard, scheduled posts and flood-wait handling.",
+         pain="Posting to dozens of groups by hand eats the day.", stat=("24/7", "posts on schedule, phone off"),
+         tags=["Telegram", "React", "Node.js"], cta="VISIT SITE  -->"),
+    dict(n="04", slug="flowpilot", title="FlowPilot", line="A Chrome extension and agent bridge that queues AI video jobs and runs them unattended.",
+         pain="Queue it, close the laptop, wake up to clips.", stat=("AFK", "batch jobs run while you sleep"),
+         tags=["Chrome MV3", "TypeScript", "WebSocket"], cta="PRIVATE BUILD"),
+]
+
+
+def work_card(p):
+    w, h = 600, 700
+    img_h = 350
+    out = [
+        f'<image href="data:image/webp;base64,{shot_b64(p["slug"] + ".webp")}" x="14" y="14" width="{w - 28}" height="{img_h}" preserveAspectRatio="xMidYMin slice"/>',
+        f'<rect x="14" y="{14 + img_h - 90}" width="{w - 28}" height="90" fill="url(#sh)"/>',
+        frame(w, h),
+        f'<text class="m" x="36" y="{img_h + 52}" font-size="11" fill="{UMBER}" letter-spacing="3">PLATE {p["n"]}</text>',
+        f'<text class="s" x="36" y="{img_h + 100}" font-size="46" fill="{BONE}">{esc(p["title"])}</text>',
+    ]
+    y = img_h + 134
+    for l in wrap(p["line"], 48):
+        out.append(f'<text class="i" x="36" y="{y}" font-size="21" fill="{LILAC}">{esc(l)}</text>')
+        y += 26
+    y += 22
+    out.append(f'<text class="s" x="36" y="{y + 26}" font-size="52" fill="{GILT}">{esc(p["stat"][0])}</text>')
+    sx = 36 + len(p["stat"][0]) * 25 + 18
+    out.append(f'<text class="m" x="{sx}" y="{y + 6}" font-size="12" fill="{MUTED}" letter-spacing="1">{esc(p["stat"][1].upper())}</text>')
+    out.append(f'<text class="m" x="{sx}" y="{y + 26}" font-size="12" fill="{UMBER}">{esc(p["pain"])}</text>')
+    y = h - 46
+    tx = 36
+    for t in p["tags"]:
+        tw = len(t) * 7.8 + 18
+        out.append(f'<rect x="{tx}" y="{y - 17}" width="{tw:.0f}" height="24" fill="none" stroke="{UMBER}"/>'
+                   f'<text class="m" x="{tx + 9}" y="{y}" font-size="13" fill="{BONE}">{esc(t)}</text>')
+        tx += tw + 8
+    out.append(f'<text class="m" x="{w - 36}" y="{y}" font-size="13" fill="{GILT}" text-anchor="end" letter-spacing="2">{esc(p["cta"])}</text>')
+    defs = (f'<defs><linearGradient id="sh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{INK}" stop-opacity="0"/>'
+            f'<stop offset="1" stop-color="{INK}"/></linearGradient></defs>')
+    return svg(w, h, defs + "".join(out), title=f'{p["title"]}: {p["line"]}')
+
+
+MORE = [
+    ("Flow Prompt Studio", "Scores AI video prompts and learns from how the clips drift.", "Python, AI video", True),
+    ("AHP Prompt Studio", "A Gemini-powered workspace for writing, testing and keeping prompts.", "Gemini, TypeScript", True),
+    ("AHP Dev Bridge", "VS Code + browser extensions that let AI agents act, behind safety gates.", "VS Code, TypeScript", True),
+    ("Weasolve", "Tells you what to eat, based on the weather outside.", "TypeScript, Python", True),
+    ("V of Spades", "A C++ project built around the UN Sustainable Development Goals.", "C++", False),
+]
+
+
+def more_plates():
+    w, lh = 1200, 84
+    h = 70 + lh * len(MORE) + 20
+    out = [frame(w, h), f'<text class="m" x="40" y="52" font-size="11" fill="{UMBER}" letter-spacing="3">MORE FROM THE WORKSHOP</text>']
+    y = 70
+    for i, (t, l, s, priv) in enumerate(MORE):
+        out.append(f'<line x1="40" x2="{w - 40}" y1="{y}" y2="{y}" stroke="{UMBER}" stroke-opacity=".35" stroke-dasharray="1 4"/>')
+        out.append(f'<text class="m" x="40" y="{y + 38}" font-size="12" fill="{UMBER}">{i + 5:02d}</text>'
+                   f'<text class="s" x="84" y="{y + 40}" font-size="30" fill="{BONE}">{esc(t)}</text>'
+                   f'<text class="i" x="84" y="{y + 68}" font-size="19" fill="{LILAC}">{esc(l)}</text>'
+                   f'<text class="m" x="{w - 40}" y="{y + 38}" font-size="12" fill="{GILT if not priv else MUTED}" text-anchor="end" letter-spacing="1">'
+                   f'{"PRIVATE" if priv else "OPEN SOURCE"} · {esc(s.upper())}</text>')
+        y += lh
+    return svg(w, h, "".join(out), title="More projects: " + "; ".join(f"{t}: {l}" for t, l, _, _ in MORE))
+
+
+SERVICES = [
+    ("i.", "Websites & web shops", "Sites and stores that load fast and sell.",
+     ["Landing pages & portfolios", "Web apps", "Shops, checkout & payments", "POS systems"], "XNight"),
+    ("ii.", "Interactive front-end", "Pages people scroll twice.",
+     ["3D & canvas", "Scroll stories", "Artistic portfolios", "Design systems"], "euriepaulino.me"),
+    ("iii.", "Automation & AI", "Bots and agents that take the busywork.",
+     ["AI agents & MCP tools", "Bots & extensions", "Integrations", "Internal tools"], "Fullstack Audit, TelePlug"),
+]
+
+
+def services(narrow=False):
+    if narrow:
+        w, colw, h = 600, 600, 3 * 300 + 30
+    else:
+        w, colw, h = 1200, 390, 400
+    out = [frame(w, h)]
+    for i, (num, title, line, items, proof) in enumerate(SERVICES):
+        x0, y0 = (0, i * 300) if narrow else (15 + i * colw, 0)
+        x = x0 + 36
+        if i and not narrow:
+            out.append(f'<line x1="{x0}" x2="{x0}" y1="40" y2="{h - 40}" stroke="{UMBER}" stroke-opacity=".45"/>')
+        if i and narrow:
+            out.append(f'<line x1="40" x2="{w - 40}" y1="{y0 + 14}" y2="{y0 + 14}" stroke="{UMBER}" stroke-opacity=".45"/>')
+        out.append(f'<text class="i" x="{x}" y="{y0 + 76}" font-size="26" fill="{GILT}">{num}</text>'
+                   f'<text class="s" x="{x}" y="{y0 + 120}" font-size="36" fill="{BONE}">{esc(title)}</text>'
+                   f'<text class="i" x="{x}" y="{y0 + 152}" font-size="19" fill="{LILAC}">{esc(line)}</text>')
+        for k, it in enumerate(items):
+            out.append(f'<text class="m" x="{x}" y="{y0 + 196 + k * 28}" font-size="15" fill="{BONE}">'
+                       f'<tspan fill="{UMBER}">-- </tspan>{esc(it)}</text>')
+        out.append(f'<text class="m" x="{x}" y="{y0 + (h - 40 if not narrow else 330)}" font-size="12" fill="{GILT}" letter-spacing="1">'
+                   f'PROOF <tspan fill="{MUTED}">{esc(proof)}</tspan></text>')
+    return svg(w, h, "".join(out), title="Services. " + " ".join(f"{t}: {l} {', '.join(it)}." for _, t, l, it, _ in SERVICES))
+
+
+STEPS = [("01", "CALL", ["tell me what", "you need, and", "who it's for"]),
+         ("02", "PLAN", ["scope, price", "and timeline,", "in writing"]),
+         ("03", "BUILD", ["you see the", "progress as it", "happens"]),
+         ("04", "SHIP", ["launched, tested,", "and I stay", "on call"])]
+WORKSHOP = [("chrome extensions", "MV3, side panels, page automation"),
+            ("telegram & discord bots", "broadcasts, commands, dashboards"),
+            ("POS systems", "sales, stock and receipts on one screen"),
+            ("AI agents & MCP tools", "agents that read, plan and act"),
+            ("prompt tooling", "studios, scorers, feedback loops")]
+
+
+ARROW = f'<tspan fill="{GILT}">--&gt;</tspan>'
+
+
+def process(narrow=False):
+    size = 15 if narrow else 17
+    cw = size * 0.6
+    lines = []  # (text, color) rows of pure ASCII
+    lines.append(("HOW A COMMISSION RUNS", UMBER))
+    lines.append(("", None))
+    if narrow:
+        for i, (n, t, d) in enumerate(STEPS):
+            box = f"[ {n} {t} ]"
+            lines.append((box + "   " + " ".join(d), BONE))
+            if i < 3:
+                lines.append(("    |", GILT))
+                lines.append(("    v", GILT))
+    else:
+        top = "".join(f"+{'-' * 11}+" + ("     " if i < 3 else "") for i in range(4))
+        mid = "".join(f"| {n} {t:<6}|" + (" --> " if i < 3 else "") for i, (n, t, _) in enumerate(STEPS))
+        lines += [(top, UMBER), (mid, BONE), (top, UMBER)]
+        for r in range(3):
+            lines.append(("".join(f" {d[r]:<17}" for _, _, d in STEPS), MUTED))
+    lines.append(("", None))
+    lines.append(("ALSO IN THE WORKSHOP", UMBER))
+    for i, (a, b) in enumerate(WORKSHOP):
+        br = "`--" if i == len(WORKSHOP) - 1 else "|--"
+        if narrow:
+            lines.append((f" {br} {a}", BONE))
+            lines.append((f" {'   ' if i == len(WORKSHOP) - 1 else '|  '}   {b}", MUTED))
+        else:
+            lines.append((f" {br} {a} {'.' * (26 - len(a))} {b}", BONE))
+    lh = size * 1.55
+    w = 600 if narrow else 1200
+    h = int(70 + lh * len(lines) + 30)
+    out = [frame(w, h)]
+    y = 70
+    for i, (t, c) in enumerate(lines):
+        if t:
+            t2 = esc(t).replace("--&gt;", ARROW)
+            out.append(f'<text class="m ln" x="44" y="{y:.0f}" font-size="{size}" fill="{c}" style="animation-delay:{i * 0.06:.2f}s">{t2}</text>')
+        y += lh
+    return svg(w, h, "".join(out), PANEL_CSS,
+               title="How a commission runs: call, plan, build, ship and support. Also: Chrome extensions, Telegram and Discord bots, POS systems, AI agents and MCP tools, prompt tooling.")
+
+
+STACK = [("front-end/", "TypeScript · React · Next.js · Vue.js · Three.js · Tailwind CSS"),
+         ("back-end/", "Node.js · Supabase · PostgreSQL · Python · C++ · REST"),
+         ("ai-and-tools/", "Claude · Gemini · ChatGPT · Antigravity · MCP · Vite · Git · Vercel")]
+
+
+def reliquary(narrow=False):
+    size = 15 if narrow else 18
+    lh = size * 1.7
+    rows = [("reliquary/", BONE, "")]
+    for i, (k, v) in enumerate(STACK):
+        br = "`--" if i == len(STACK) - 1 else "|--"
+        if narrow:
+            rows.append((f"{br} {k}", GILT, ""))
+            for part in wrap(v, 44):
+                rows.append((("    " if i == len(STACK) - 1 else "|   ") + part, BONE, ""))
+        else:
+            rows.append((f"{br} {k:<14}", GILT, v))
+    w = 600 if narrow else 1200
+    h = int(60 + lh * len(rows) + 30)
+    out = [frame(w, h)]
+    y = 66
+    for i, (a, c, b) in enumerate(rows):
+        out.append(f'<text class="m ln" x="44" y="{y:.0f}" font-size="{size}" style="animation-delay:{i * 0.12:.2f}s">'
+                   f'<tspan fill="{UMBER if a[:1] in "|`" else c}">{esc(a[:4]) if a[:1] in "|`" else ""}</tspan>'
+                   f'<tspan fill="{c}">{esc(a[4:] if a[:1] in "|`" else a)}</tspan><tspan fill="{BONE}">{esc(b)}</tspan></text>')
+        y += lh
+    return svg(w, h, "".join(out), PANEL_CSS, title="Stack. " + " ".join(f"{k} {v}." for k, v in STACK))
+
+
+LINKS = [("PORTFOLIO", "euriepaulino.me"), ("EMAIL", "euriepaulino@gmail.com"), ("LINKEDIN", "eurie-paulino"),
+         ("X", "@EuriePaulino"), ("FACEBOOK", "Eurie Paulino")]
+
+
+def contact(narrow=False):
+    w, h = (600, 640) if narrow else (1200, 430)
+    out = [defs_common(w, h), frame(w, h)]
+    if narrow:
+        out.append(f'<text class="s" x="{w / 2}" y="100" font-size="46" fill="{BONE}" text-anchor="middle">Chains are just links.</text>'
+                   f'<text class="i" x="{w / 2}" y="150" font-size="38" fill="{GILT}" text-anchor="middle">Here are mine.</text>')
+        out.append(chain((40, 200), (w - 40, 200), 30, link=16, color="#6b5a3e", hi=GILT))
+        y = 280
+        for k, v in LINKS:
+            out.append(f'<text class="m" x="60" y="{y}" font-size="12" fill="{UMBER}" letter-spacing="2">{k}</text>'
+                       f'<text class="m" x="{w - 60}" y="{y}" font-size="17" fill="{BONE}" text-anchor="end">{esc(v)}</text>')
+            y += 46
+        out.append(f'<text class="i" x="{w / 2}" y="{h - 40}" font-size="20" fill="{MUTED}" text-anchor="middle">’til death, we do art.</text>')
+    else:
+        out.append(f'<text class="s" x="{w / 2}" y="104" font-size="60" fill="{BONE}" text-anchor="middle">Chains are just links. '
+                   f'<tspan class="i" fill="{GILT}">Here are mine.</tspan></text>')
+        out.append(chain((60, 160), (w - 60, 160), 40, link=16, color="#6b5a3e", hi=GILT))
+        n = len(LINKS)
+        for i, (k, v) in enumerate(LINKS):
+            x = 60 + (w - 120) * (i + 0.5) / n
+            t = (i + 0.5) / n
+            cy = (1 - t) ** 2 * 160 + 2 * (1 - t) * t * 200 + t * t * 160  # sit on the chain's sag
+            out.append(f'<line x1="{x:.0f}" x2="{x:.0f}" y1="{cy + 6:.0f}" y2="250" stroke="{UMBER}" stroke-dasharray="2 3"/>'
+                       f'<text class="m" x="{x:.0f}" y="278" font-size="11" fill="{UMBER}" letter-spacing="3" text-anchor="middle">{k}</text>'
+                       f'<text class="m" x="{x:.0f}" y="304" font-size="15" fill="{BONE}" text-anchor="middle">{esc(v)}</text>')
+        out.append(f'<text class="i" x="{w / 2}" y="360" font-size="21" fill="{LILAC}" text-anchor="middle">Tell me what you need, and who it’s for. Scope, price and timeline come back in writing.</text>'
+                   f'<text class="m" x="{w / 2}" y="398" font-size="12" fill="{UMBER}" text-anchor="middle" letter-spacing="2">-------  ’TIL DEATH, WE DO ART.  -------</text>')
+    return svg(w, h, "".join(out), title="Chains are just links. Here are mine: euriepaulino.me, euriepaulino@gmail.com, LinkedIn, X, Facebook.")
+
+
 if __name__ == "__main__":
+    write("whoami.svg", whoami())
+    write("whoami-narrow.svg", whoami(narrow=True))
+    for p in WORK:
+        write(f"plate-{p['slug']}.svg", work_card(p))
+    write("plates-more.svg", more_plates())
+    write("services.svg", services())
+    write("services-narrow.svg", services(narrow=True))
+    write("process.svg", process())
+    write("process-narrow.svg", process(narrow=True))
+    write("reliquary.svg", reliquary())
+    write("reliquary-narrow.svg", reliquary(narrow=True))
+    write("contact.svg", contact())
+    write("contact-narrow.svg", contact(narrow=True))
     write("hero.svg", hero(1200, 620))
     write("hero-narrow.svg", hero(600, 820, narrow=True))
     write("fall.svg", fall())
